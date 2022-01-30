@@ -13,7 +13,7 @@ Models include:
 * Player load    
 
 **Note** The VO2 max and critical speed models are approximations. The VO2 max and maximal aerobic speed models are not validated and have no physiological justifications.    
-**Note** All values must be in m/s (meters per second). You can use the `convert.to.metric()` function from *fvp* to help with conversions.    
+**Note** All values must be in m/s (meters per second). You can use the `convert.to.metric()` function to help with conversions.    
 
 ## Installing the Package
 
