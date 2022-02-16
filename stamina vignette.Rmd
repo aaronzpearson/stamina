@@ -1,0 +1,401 @@
+---
+title: "Intro to stamina"
+author: "Aaron Pearson"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to stamina}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(stamina)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+
+theme_set(theme_minimal())
+
+data(jog.1)
+data(jog.2)
+```
+
+stamina is a lightweight package that provides Sports Scientists the opportunity to get more out of an athlete's positional tracking data. With this package, you can model:   
+* player load    
+* metabolic power    
+* V(dot)O2 max    
+* critical speed    
+* D' balance    
+
+This package compliments {fvp} (github.com/aaronzpearson/fvp) by returning different aspects of a player's aerobic and anaerobic abilities. Like {fvp}, the package returns modelled observation that can be plotted.    
+
+## Installing the Package
+
+To install the package, copy-and-paste the following code into your R console. The package is very small and should download quickly.
+
+```{r download, eval = FALSE, include = TRUE}
+devtools::install_github("aaronzpearson/stamina")
+library(stamina)
+```
+
+The examples rely on three other packages for efficient data cleaning and aesthetically pleasing plots. If you don't have these packages installed on your computer, you can download them copy-and-pasting the following into your R console. You do not need to install these packages for the package to work.
+
+```{r plotting-setup, eval = FALSE, include = TRUE}
+install.packages("ggplot2") 
+install.packages("dplyr")
+install.packages("magrittr")
+
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+```
+    
+## Package Functionality    
+
+This package was built to return as much information as possible with minimal effort for the user. As such, the end-user only needs to run the `stamina.player.profile()` and `stamina.results.model()` functions. 
+    
+**Note** The critical speed, D', and VO2 max models are estimates that have **not** been validated. Please use caution when tracking an athlete's fitness levels using these models.    
+
+**Note** Player speed and acceleration must be in metric. It is suggested that you have speed in m/s and km/h and acceleration in m/s/s.
+    
+### Function Families
+    
+To provide practitioners the ability to produce multiple analyses, functions are grouped by *family*. As such, each family of functions begins with the same prefix. Expanding on the models outlined above, the prefixes are:
+    
+* `stamina`: All-encompassing model    
+* `vo2`: V(dot)O2 and VO2 max
+* `met`: Metabolic energy and metabolic power
+* `cs`: Critical speed
+* `dp`: D prime balance
+* `pl`: Player load
+
+### Function Naming Conventions
+
+For consistency, the function names (after the prefix) follow the following naming convention:
+    
+* `.player.profile`: Models a player's abilities and returns a summarized data frame 
+* `.results.model`: Data set containing modelled observations.
+
+Or they are indicative of their output for the current instance. For example, `vo2.jog` returns the approximate VO2 utilization while a player moves at a jogging pace. 
+
+If you are familiar with {fvp}, you'll notice that the function naming is similar. 
+
+# Sample Code
+
+This vignette provides a brief overview of each *family* of functions in the package using sample code. As was stated above, the `stamina` functions are over-arching and can be used without worrying about the minutia.
+
+The analyses below are completed using the data sets `jog.1` and `jog.2` which are cleaned and anonymized positional tracking data from a state-ranked cross-country skier's dryland running sessions. The data is pulled from a smart-watch that recorded data at 1Hz (1 observation per second).
+
+```{r}
+data(jog.1)
+head(jog.1)
+```
+
+```{r}
+data(jog.2)
+head(jog.2)
+```
+
+To visualize the athlete's session intensity, we'll overlay the athlete's speed over time. You'll notice that `jog.1` is shorter in duration and at a greater intensity than `jog.2`. This becomes important when modelling critical speed, max aerobic speed, and VO2max. 
+
+Since the data does not come with time (these are snippets of training sessions), we'll add time before plotting. We'll also use `ggplot2` for advanced graphics.
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+jog.1$duration <- 1:nrow(jog.1)
+jog.2$duration <- 1:nrow(jog.2)
+
+ggplot() +
+  geom_line(data = jog.1, aes(x = duration/60, y = vel), colour = "red") +
+  geom_line(data = jog.2, aes(x = duration/60, y = vel), colour = "blue") +
+  ggtitle("Comparing jog.1 (red) and jog.2 (blue) Velocities over Time") +
+  xlab("Time (min)") +
+  ylab("Velocity (m/s)")
+```
+
+
+## `stamina` The complete model
+
+The `stamina.player.profile` function is built to model the athlete's critical speed (m/s), d' (m), max aerobic speed (m/s), and VO2max (ml/kg/min).
+
+We'll use both data sets to compare model outputs for each training session. 
+
+**Note** The `stamina.player.profile` returns values that have not been validated.
+
+**Note** The `stamina` functions can take up to 1 minute to run the multiple models on the back-end.
+
+```{r}
+jog.1.stamina.profile <- stamina.player.profile(speed = jog.1$vel,
+                                                dur = 600, # the duration in the speed-duration model
+                                                sample.rate = 1,
+                                                algo = "slow") # algo is covered in the `cs` section
+
+jog.1.stamina.profile
+```
+
+```{r}
+jog.2.stamina.profile <- stamina.player.profile(speed = jog.2$vel,
+                                                dur = 600, # the duration in the speed-duration model
+                                                sample.rate = 1,
+                                                algo = "slow")
+
+jog.2.stamina.profile
+```
+
+You'll notice that the outputs are different. This is because the models depend on the athlete's intensity level during the given session. If they ran at maximal efforts, we should expect to see more accurate values returned.
+
+That said, the athlete's critical speed modelled from `jog.1` is close to reality. VO2max estimates are much lower than the athlete's actual VO2max of 69 ml/kg/min.
+
+If you want to plot the athlete's speed, d' balance, metabolic power, V(dot)O2, etc, use the `stamina.results.model` function. The `vo2`, `crit.speed`, and `d.prime` arguments are set to `auto` which will estimate the athlete's abilities. If these values are known, input them where appropriate for better model outputs. In this example, `vo2` and `crit.speed` are set to `auto` and override `d.prime` with the athlete's known d' value.
+
+If your data does not provide acceleration values, set `ax = NA` and `player.load = FALSE`.
+
+```{r}
+jog.1.stamina.model <- stamina.results.model(speed = jog.1$vel, 
+                                             ax = jog.1$accel,
+                                             vo2 = "auto",
+                                             crit.speed = "auto",
+                                             d.prime = 180,
+                                             player.load = TRUE,
+                                             sample.rate = 1)
+
+head(jog.1.stamina.model)
+```
+
+```{r}
+tail(jog.1.stamina.model)
+```
+
+
+## `vo2` V(dot)O2 and VO2 max
+
+The following examples use the `jog.1` data set. I encourage you to also complete the same analyses using `jog.2`.
+
+**Estimate VO2 Utilization**
+
+The majority of `vo2` functions are built to estimate an athlete's instantaneous and cumulative VO2 utilization or the kcal equivalence. These functions take the athlete's speed (in kph). Therefore, we'll use the athlete's `vel.kph` observations.
+
+The example below will extend the `jog.1` data set by adding instantaneous VO2 estimates. The `vo2.auto()` function selects the most-appropriate V(dot)O2 formula. You can override this by calling other `vo2` functions. Type `help(vo2.auto)` in the console to view the other functions that are available.
+
+```{r}
+jog.vo2 <- jog.1 # build a new data set to make sure we don't overwrite anything
+
+jog.vo2$vo2 <- vo2.auto(speed.kph = jog.vo2$vel.kph, # returns values in ml/kg/min
+                        vo2.max = 69) # VO2max is known
+
+tail(jog.vo2)
+```
+
+**kcal Equivalent**
+
+For this example, `jog.vo2$vo2` will be used to return estimated instantaneous and cummulative caloric expenditure in kcal/kg.
+
+```{r}
+jog.vo2$kcal.vo2 <- vo2.kcal.dist(speed = jog.vo2$vel.kph,
+                                  sample.rate = 1)
+jog.vo2$kcal.vo2.sum <- cumsum(jog.vo2$kcal.vo2) # cumulative summation
+```
+
+```{r}
+tail(jog.vo2)
+```
+
+The cumulative VO2 kcal of 12.15 is not the kcalories that the athlete expeneded. The value is returned as kcal/kg. Therefore, with this athlete weighting approximately 55 kg, their total expenditure is 55*12.15 = 668.25 kcal. To add context, this session is 70 minutes which resulted in ~670kcal expended (which makes sense).
+
+**Plotting**
+
+Below, we overlay V(dot)O2 kcal and the athlete's speed in m/s. As would be expected, V(dot)O2 kcal mirrors changes in the athlete's intensity level. 
+
+*Note* The athlete's V(dot)O2 kcal is multiplied by 1000 for improved visualizations. 
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.vo2 <- ggplot(data = jog.vo2, aes(duration/60)) +
+  # geom_point(aes(y = vo2), colour = "grey", alpha = 0.5) +
+  geom_line(aes(y = vel), colour = "black", alpha = 0.5) +
+  geom_line(aes(y = kcal.vo2 * 1000), colour = "red") +
+  
+  xlab("Time (min)") +
+  ylab("Speed (m/s), kcal Equivalent (at 1000 x kcal/kg)") +
+  ggtitle("V(dot)O2 and kcal Equivalent Over Time")
+  
+p.vo2
+```
+
+## `met` Metabolic power and energy
+
+Metabolic power and energy functions are similar to those in the `vo2` family by taking on a player's instantaneous rate acceleration.
+
+```{r}
+jog.met <- jog.1 # so we don't overwrite jog.1
+
+jog.met$met.energy = met.energy(accel = jog.met$accel)
+jog.met$met.power = met.power(speed = jog.met$vel, 
+                              accel = jog.met$accel)
+```
+
+```{r}
+head(jog.met)
+```
+The data set returns metabolic energy < 0, which is not possible. Therefore, we must remove these observations.
+
+```{r}
+jog.met <- jog.met %>%
+  filter(met.energy > 0)
+```
+
+**Plotting**
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.met <- ggplot(data = jog.met, aes(x = duration/60)) +
+  geom_line(aes(y = accel), colour = "grey") + # very little deviations in speed results in minimal acceleration changes
+  geom_line(aes(y = met.power), colour = "black") +
+  geom_line(aes(y = met.energy), colour = "red", alpha = 0.25) +
+  
+  xlab("Time (min)") +
+  ylab(".") +
+  ggtitle("Metabolic Energy and Power Over Time")
+
+p.met
+```
+
+## `cs` Critical Speed
+
+The `cs` family can be used solo or in conjunction with the `dp` family. `cs.results.model` returns the athlete's speed-duration curve for the session. The algorithm (`algo`) argument can be set to `fast` or `slow`. If your data set is large, setting it to `fast` will significantly speed up the process but return a very rough model output. 
+
+We'll compare the `fast` and `slow` data sets below.
+
+```{r}
+jog.cs <- jog.1
+
+jog.cs.model.slow <- cs.results.model(speed = jog.1$vel, # this took ~10 s on my local machine
+                                      algo = "slow",
+                                      sample.rate = 1, 
+                                      dur = 600) # model over 600 s
+
+jog.cs.model.fast <- cs.results.model(speed = jog.1$vel,
+                                      algo = "fast", 
+                                      sample.rate = 1, 
+                                      dur = 600)
+```
+
+**Plotting**
+
+Critical speed observations versus modelled data:
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.cs <- ggplot(jog.cs.model.slow, aes(x = dur)) +
+  geom_point(aes(y = speed), colour = "grey") +
+  geom_line(aes(y = pred), colour = "black") +
+  
+  ggtitle("Critical Speed Model and Predicted Observations") +
+  ylab("Speed (m/s)") +
+  xlab("Duration (s)")
+
+p.cs
+```
+Comparing algorithms:
+
+As you can see, there is a stark contrast between algorithms!
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.cs.compare <- ggplot(jog.cs.model.slow, aes(x = dur)) +
+  geom_point(data = jog.cs.model.slow, aes(y = speed), colour = "grey") +
+  geom_line(data = jog.cs.model.slow, aes(y = pred), colour = "black") +
+  geom_line(data = jog.cs.model.fast, aes(y = pred), colour = "red") +
+  
+  ggtitle("Compare Critical Algorithms") +
+  ylab("Speed (m/s)") +
+  xlab("Duration (s)")
+
+p.cs.compare
+```
+
+
+
+## `dp` D Prime Balance
+
+The `dp` family of functions are limited and are mainly used as helper functions and rely on the `dp.bal()` function. Since the model is nowhere near perfect, D' balance can drop below 0. A lower limit of -50 m is set and can be adjusted. If your values are regularly returned below 0, the critical speed and d' estimates require attention. 
+
+In the example below, I set the athlete's critical speed and d' below their actual abilities to for improved visualization.
+
+```{r}
+jog.dp <- jog.1
+
+jog.dp$d.bal <- dp.bal(speed = jog.1$vel, 
+                          cs = 3, 
+                          d0 = 80, 
+                          t.diff = 1,
+                          d.bal.min = -50)
+```
+
+**Plotting**
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.dp <- ggplot(data = jog.dp, aes(x = duration/60)) +
+  geom_line(aes(y = vel), colour = "grey") +
+  geom_hline(aes(yintercept = 3), alpha = 0.5) +
+  geom_line(aes(y = d.bal)) +
+  ggtitle("D' Balance over Time") +
+  xlab("Time (min)") +
+  ylab("D' Balance (m) and Athlete Speed (m/s)")
+
+p.dp
+
+```
+
+## `pl` Player Load
+
+The `pl` functions are built to emulate the Player Load metric introduced by Catapult Sports(R). This function deviates by providing the option of including acceleration in 1, 2, or 3 planes of motion. This was done to provide practitioners with limited acceleration observations in their player tracking data the ability to model Player Load.
+
+Player load can be returned as an instantaneous or cumulative value.
+
+```{r}
+jog.pl <- jog.1
+
+jog.pl$player.load <- pl.player.load(ax = jog.pl$accel, # this data set doesn't have ay or az
+                                     cumulative = FALSE, # ay and az are optional, so you can leave them out
+                                     sample.rate = 1)
+
+jog.pl$player.load.sum <- pl.player.load(ax = jog.pl$accel,
+                                         cumulative = TRUE,
+                                         sample.rate = 1)
+```
+
+**Plotting**
+
+For this example, we'll remove deceleration below -1 m/s/s to improve visualization.
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+jog.pl <- jog.pl %>% 
+  filter(accel >= -1)
+
+p.pl <- ggplot(jog.pl, aes(x = duration/60)) +
+  geom_point(aes(y = accel), colour = "grey") +
+  geom_line(aes(y = player.load)) +
+  
+  ggtitle("Instantaneous Player Load vs. Acceleration over Time") +
+  xlab("Time (min)") +
+  ylab("Player Load (AU) and Acceleration (m/s/s)")
+
+p.pl
+```
+
+Cumulative player load over time:
+
+```{r, fig.height=5, fig.width=7, fig.align='center'}
+p.pl.sum <- ggplot(jog.pl, aes(x = duration/60)) +
+  geom_point(aes(y = accel), colour = "grey") +
+  geom_line(aes(y = player.load.sum)) +
+  
+  ggtitle("Cumulative Athlete Load vs. Acceleration over Time") +
+  xlab("Time (min)") +
+  ylab("Player Load (AU) and Acceleration (m/s/s)")
+
+p.pl.sum
+```
+

@@ -1,0 +1,12 @@
+Package: stamina
+Type: Package
+Title: Model Player Load and Energy Expenditure
+Version: 0.1.0
+Author: Aaron Pearson
+Maintainer: Aaron Pearson <aaron@midsprint.io>
+Description: Provides sports scientists a light-weight R package to model player load and energy expenditure.
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.2
+Imports: 
+    purrr
